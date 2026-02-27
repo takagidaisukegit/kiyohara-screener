@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>清原達郎式スクリーナー</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+
+    <!-- ヘッダー -->
+    <header class="header">
+      <div class="header-inner">
+        <div class="header-title">
+          <span class="header-icon">📈</span>
+          <div>
+            <h1>清原達郎式スクリーナー</h1>
+            <p class="header-subtitle">ネットキャッシュ比率 × PBR × PER による日本小型株スクリーニング</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <div id="lastUpdated" class="last-updated"></div>
+          <button id="btnScreen" class="btn-primary" onclick="runScreening()">
+            <span class="btn-icon">▶</span>スクリーニング実行
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 基準サマリー -->
+    <section class="criteria-bar">
+      <div class="criteria-bar-inner">
+        <span class="criteria-label">選定基準</span>
+        <div class="criteria-badges">
+          <span class="badge badge-blue">ネットキャッシュ比率 ≥ 0.5</span>
+          <span class="badge badge-purple">時価総額 50〜1,000億円</span>
+          <span class="badge badge-green">PBR ≤ 1.0倍</span>
+          <span class="badge badge-orange">PER ≤ 20倍</span>
+          <span class="badge badge-gray">上位20社表示</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- メインコンテンツ -->
+    <main class="main">
+
+      <!-- 統計カード -->
+      <div id="statsRow" class="stats-row" style="display:none">
+        <div class="stat-card">
+          <div class="stat-value" id="statScreened">—</div>
+          <div class="stat-label">スクリーニング対象</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statPassed">—</div>
+          <div class="stat-label">基準通過</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statShown">—</div>
+          <div class="stat-label">表示件数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statPassRate">—</div>
+          <div class="stat-label">通過率</div>
+        </div>
+      </div>
+
+      <!-- ローダー -->
+      <div id="loader" class="loader-wrap" style="display:none">
+        <div class="spinner"></div>
+        <p class="loader-text">スクリーニング実行中...<br><span class="loader-sub">約300銘柄を並列取得しています（1〜2分程度）</span></p>
+      </div>
+
+      <!-- エラー -->
+      <div id="errorBox" class="error-box" style="display:none"></div>
+
+      <!-- 初期メッセージ -->
+      <div id="emptyState" class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <h2>スクリーニングを開始してください</h2>
+        <p>「スクリーニング実行」ボタンを押すと、清原達郎式の基準で<br>日本小型株約300銘柄をスキャンし、上位20社を表示します。</p>
+        <div class="criteria-detail">
+          <h3>選定基準の詳細</h3>
+          <ul>
+            <li><strong>ネットキャッシュ比率 ≥ 0.5</strong>：(流動資産 + 投資有価証券×70% − 負債) ÷ 時価総額</li>
+            <li><strong>時価総額 50〜1,000億円</strong>：機関投資家の死角となる小型株に限定</li>
+            <li><strong>PBR ≤ 1.0倍</strong>：純資産より安く買える状態</li>
+            <li><strong>PER ≤ 20倍</strong>：利益面からの割安確認</li>
+            <li><strong>ソート</strong>：ネットキャッシュ比率降順 → PBR昇順</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- テーブル -->
+      <div id="tableWrap" class="table-wrap" style="display:none">
+        <div class="table-header-row">
+          <h2 class="table-title">スクリーニング結果 上位<span id="resultCount">—</span>社</h2>
+          <div class="table-note">※ネットキャッシュ比率降順でソート</div>
+        </div>
+        <div class="table-scroll">
+          <table id="stockTable" class="stock-table">
+            <thead>
+              <tr>
+                <th class="th-rank">順位</th>
+                <th class="th-code">コード</th>
+                <th class="th-name">銘柄名</th>
+                <th class="th-sector">業種</th>
+                <th class="th-price">株価</th>
+                <th class="th-ncr sort-active" data-col="net_cash_ratio" onclick="sortTable('net_cash_ratio')">
+                  ネットキャッシュ比率 <span class="sort-icon">▼</span>
+                </th>
+                <th class="th-nc" data-col="net_cash_oku" onclick="sortTable('net_cash_oku')">
+                  NC額(億円) <span class="sort-icon">⇅</span>
+                </th>
+                <th class="th-pbr" data-col="pbr" onclick="sortTable('pbr')">
+                  PBR <span class="sort-icon">⇅</span>
+                </th>
+                <th class="th-per" data-col="per" onclick="sortTable('per')">
+                  PER <span class="sort-icon">⇅</span>
+                </th>
+                <th class="th-cap" data-col="market_cap_oku" onclick="sortTable('market_cap_oku')">
+                  時価総額(億) <span class="sort-icon">⇅</span>
+                </th>
+                <th class="th-div" data-col="dividend_yield" onclick="sortTable('dividend_yield')">
+                  配当利回り <span class="sort-icon">⇅</span>
+                </th>
+                <th class="th-links">チャート</th>
+              </tr>
+            </thead>
+            <tbody id="stockTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- フッター -->
+    <footer class="footer">
+      <p>本ツールは投資推奨ではありません。データはYahoo Finance（yfinance）より取得。最終判断はご自身の責任で行ってください。</p>
+    </footer>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
