@@ -2,6 +2,7 @@
 清原達郎式スクリーナー - FastAPI バックエンド
 """
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -13,11 +14,21 @@ import logging
 
 from screener import run_screening, CRITERIA
 from candidates import CANDIDATE_CODES
+import name_lookup
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 起動時: JPX から日本語銘柄名をロード（キャッシュあれば即時）
+    name_lookup.initialize()
+    yield
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="清原達郎式スクリーナー API",
     description="ネットキャッシュ比率 × PBR × PER による日本小型株スクリーニング",
     version="1.0.0",

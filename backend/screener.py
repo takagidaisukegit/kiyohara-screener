@@ -17,6 +17,8 @@ from datetime import datetime
 import logging
 from typing import Optional
 
+import name_lookup
+
 logger = logging.getLogger(__name__)
 
 CRITERIA = {
@@ -201,9 +203,17 @@ def _fetch_single(code: str, criteria: dict) -> Optional[dict]:
     if ncr is not None:
         net_cash_oku = round(ncr * market_cap_jpy / 1e8, 1)
 
+    # 日本語銘柄名: JPX データ → longName → shortName の順で取得
+    name = (
+        name_lookup.get(code)
+        or info.get("longName")
+        or info.get("shortName")
+        or code
+    )
+
     return {
         "code":           code,
-        "name":           info.get("longName") or info.get("shortName") or code,
+        "name":           name,
         "sector":         sector,
         "price":          info.get("currentPrice") or info.get("regularMarketPrice") or 0,
         "pbr":            round(pbr, 2),
