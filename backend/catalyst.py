@@ -127,16 +127,16 @@ def _rule_based(
     if per and per <= 8:
         results.append("PER一桁：収益力に対し著しく割安")
 
-    # ④ セクター固有カタリスト（英語セクター名で判定）
-    if sector_en == "Real Estate":
+    # ④ セクター固有カタリスト（英語・日本語どちらも対応）
+    if any(s in sector_en for s in ("Real Estate", "不動産")):
         results.append("不動産含み益の顕在化期待")
-    elif sector_en in ("Technology", "Communication Services"):
+    elif any(s in sector_en for s in ("Technology", "Communication Services", "テクノロジー", "情報・通信")):
         results.append("DX・AI需要拡大の恩恵期待")
-    elif sector_en == "Industrials":
+    elif any(s in sector_en for s in ("Industrials", "資本財")):
         results.append("設備投資回復局面での業績改善期待")
-    elif sector_en == "Consumer Cyclical":
+    elif any(s in sector_en for s in ("Consumer Cyclical", "消費者サービス")):
         results.append("消費回復・インバウンド需要の恩恵期待")
-    elif sector_en == "Healthcare":
+    elif any(s in sector_en for s in ("Healthcare", "ヘルスケア")):
         results.append("高齢化需要・医療DXの追い風期待")
 
     return results
@@ -190,12 +190,13 @@ def analyze(code: str, base_data: Optional[dict] = None) -> str:
         except Exception:
             continue
 
-    if not ticker:
+    # base_data もなく ticker も取れない場合のみ失敗とする
+    if not ticker and not base_data:
         return "データ取得失敗"
 
     # ── Step 2: NCR を決定（base_data があればそのまま使用） ──
     ncr: Optional[float] = base_data.get("net_cash_ratio") if base_data else None
-    if ncr is None:
+    if ncr is None and ticker:
         try:
             bs = ticker.balance_sheet
             market_cap_jpy = info.get("marketCap", 0)
@@ -203,39 +204,42 @@ def analyze(code: str, base_data: Optional[dict] = None) -> str:
         except Exception:
             pass
 
-    # ── Step 3: 財務指標（base_data 優先） ──
+    # ── Step 3: 財務指標（base_data 優先、なければ info から取得） ──
     if base_data:
         pbr       = base_data.get("pbr", 0)
         per       = base_data.get("per", 0)
         div_yield = base_data.get("dividend_yield", 0)
         cap_oku   = base_data.get("market_cap_oku", 0)
+        # base_data のセクターは日本語に翻訳済み。_rule_based は日英両対応。
+        sector = base_data.get("sector", "")
     else:
         pbr       = info.get("priceToBook") or 0
         per       = info.get("trailingPE") or info.get("forwardPE") or 0
         div_yield = (info.get("dividendYield") or 0) * 100
         cap_oku   = (info.get("marketCap") or 0) / 1e8
-
-    sector_en = info.get("sector") or ""  # 英語のまま使用
+        sector    = info.get("sector") or ""  # 英語
 
     # ── Step 4: ルールベース分析 ──
-    catalysts = _rule_based(ncr, pbr, per, div_yield, cap_oku, sector_en)
+    catalysts = _rule_based(ncr, pbr, per, div_yield, cap_oku, sector)
 
-    # ── Step 5: 四半期業績トレンド（追加フェッチ） ──
-    try:
-        trend = _earnings_trend(ticker)
-        if trend and trend not in catalysts:
-            catalysts.insert(0, trend)
-    except Exception:
-        pass
+    # ── Step 5: 四半期業績トレンド（ticker が取れた場合のみ） ──
+    if ticker:
+        try:
+            trend = _earnings_trend(ticker)
+            if trend and trend not in catalysts:
+                catalysts.insert(0, trend)
+        except Exception:
+            pass
 
-    # ── Step 6: ニュースキーワード（追加フェッチ） ──
-    try:
-        news_cats = _news_based(ticker.news or [])
-        for c in news_cats:
-            if c not in catalysts:
-                catalysts.append(c)
-    except Exception:
-        pass
+    # ── Step 6: ニュースキーワード（ticker が取れた場合のみ） ──
+    if ticker:
+        try:
+            news_cats = _news_based(ticker.news or [])
+            for c in news_cats:
+                if c not in catalysts:
+                    catalysts.append(c)
+        except Exception:
+            pass
 
     if not catalysts:
         return "明確なカタリストなし"
