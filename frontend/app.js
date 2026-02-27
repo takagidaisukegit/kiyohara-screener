@@ -100,7 +100,9 @@ function buildRow(s, index) {
   const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
   const rankHtml = rank <= 3 ? `<span class="rank-medal">${medal}</span>` : rank;
 
-  const ncrClass = s.net_cash_ratio >= 1.5 ? 'ncr-high' : s.net_cash_ratio >= 1.0 ? 'ncr-mid' : 'ncr-low';
+  const ncr = s.net_cash_ratio;
+  const ncrClass = ncr === null ? '' : ncr >= 1.5 ? 'ncr-high' : ncr >= 1.0 ? 'ncr-mid' : 'ncr-low';
+  const ncrText  = ncr === null ? '<span style="color:var(--text-dim)">N/A</span>' : `<span class="${ncrClass}">${ncr.toFixed(2)}</span>`;
   const pbrClass = s.pbr <= 0.4 ? 'pbr-vlow' : s.pbr <= 0.7 ? 'pbr-low' : 'pbr-mid';
   const perClass = s.per <= 10 ? 'per-low' : 'per-mid';
   const divClass = s.dividend_yield >= 4 ? 'div-high' : s.dividend_yield >= 2.5 ? 'div-mid' : '';
@@ -131,7 +133,7 @@ function buildRow(s, index) {
       </td>
       <td class="td-sector"><span class="sector-tag">${escHtml(s.sector)}</span></td>
       <td class="td-price">${price}</td>
-      <td class="td-ncr"><span class="${ncrClass}">${s.net_cash_ratio.toFixed(2)}</span></td>
+      <td class="td-ncr">${ncrText}</td>
       <td class="td-nc">${ncStr}</td>
       <td class="td-pbr"><span class="${pbrClass}">${s.pbr.toFixed(2)}x</span></td>
       <td class="td-per"><span class="${perClass}">${s.per.toFixed(1)}x</span></td>
