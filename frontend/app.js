@@ -113,6 +113,7 @@ async function runScreening() {
 
     renderStats(data);
     renderTable(currentData);
+    loadCatalysts(currentData);  // スクリーニング結果が出た後、非同期でカタリスト分析
 
     document.getElementById('lastUpdated').textContent = `最終更新: ${data.updated_at}`;
 
@@ -214,8 +215,44 @@ function buildRow(s, index) {
       <td class="td-per"><span class="${perClass}">${s.per.toFixed(1)}x</span></td>
       <td class="td-cap">${capStr}</td>
       <td class="td-div"><span class="${divClass}">${divStr}</span></td>
+      <td class="td-catalyst" id="catalyst-${s.code}">
+        <span class="catalyst-loading">分析中...</span>
+      </td>
       <td class="td-links">${linkHtml}</td>
     </tr>`;
+}
+
+// ===== カタリスト非同期ロード =====
+
+/**
+ * スクリーニング結果の全銘柄に対してカタリスト分析を並列リクエストし、
+ * 各セルを受信し次第更新する。
+ */
+function loadCatalysts(stocks) {
+  stocks.forEach(s => {
+    fetchOneCatalyst(s.code);
+  });
+}
+
+async function fetchOneCatalyst(code) {
+  const cell = document.getElementById(`catalyst-${code}`);
+  if (!cell) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/catalyst/${encodeURIComponent(code)}`);
+    if (!res.ok) {
+      cell.innerHTML = '<span class="catalyst-none">—</span>';
+      return;
+    }
+    const data = await res.json();
+    const text = data.catalyst || '—';
+    if (text === '明確なカタリストなし' || text === '—') {
+      cell.innerHTML = `<span class="catalyst-none">${escHtml(text)}</span>`;
+    } else {
+      cell.innerHTML = `<span class="catalyst-text">${escHtml(text)}</span>`;
+    }
+  } catch (e) {
+    cell.innerHTML = '<span class="catalyst-none">—</span>';
+  }
 }
 
 // ===== ソート =====

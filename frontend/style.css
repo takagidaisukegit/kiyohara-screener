@@ -315,6 +315,39 @@ body {
 .link-buffett  { background: rgba(139,92,246,0.15); color: #a78bfa; border: 1px solid rgba(139,92,246,0.25); }
 .link-irbank   { background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.25); }
 
+/* ===== Catalyst Column ===== */
+.th-catalyst {
+  text-align: left !important;
+  cursor: default !important;
+  min-width: 220px;
+}
+.td-catalyst {
+  max-width: 280px;
+  min-width: 180px;
+  white-space: normal;
+  line-height: 1.5;
+  vertical-align: middle;
+}
+.catalyst-loading {
+  color: var(--text-dim);
+  font-size: 12px;
+  animation: catalyst-pulse 1.4s ease-in-out infinite;
+}
+@keyframes catalyst-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+.catalyst-text {
+  font-size: 12px;
+  color: #a5b4fc;
+  line-height: 1.6;
+  display: block;
+}
+.catalyst-none {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
 /* ===== Footer ===== */
 .footer {
   text-align: center; padding: 20px 32px;

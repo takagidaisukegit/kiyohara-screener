@@ -14,6 +14,7 @@ import logging
 
 from screener import run_screening, CRITERIA
 from candidates import CANDIDATE_CODES
+from catalyst import analyze as analyze_catalyst
 import name_lookup
 
 logging.basicConfig(level=logging.INFO)
@@ -100,6 +101,28 @@ def get_cache():
     if _cache["data"] is None:
         raise HTTPException(status_code=404, detail="キャッシュがありません。先にスクリーニングを実行してください。")
     return _cache["data"]
+
+
+@app.get("/api/catalyst/{code}")
+def get_catalyst(code: str):
+    """
+    スクリーニング通過銘柄のカタリストを分析して返す。
+    _cache に保存済みのデータがあれば財務指標を再フェッチせずに使用する。
+    """
+    # 既存キャッシュから該当銘柄データを取得
+    base_data = None
+    if _cache["data"]:
+        for stock in _cache["data"].get("stocks", []):
+            if stock.get("code") == code:
+                base_data = stock
+                break
+
+    try:
+        result = analyze_catalyst(code, base_data)
+        return {"code": code, "catalyst": result}
+    except Exception as e:
+        logger.error(f"カタリスト分析エラー ({code}): {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/status")
