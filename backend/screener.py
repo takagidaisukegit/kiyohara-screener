@@ -5,6 +5,10 @@
   - totalCurrentAssets / totalLiab は info に入らないため balance_sheet から取得
   - 名証上場銘柄は .T が 404 になるため .N (Nagoya) にフォールバック
   - trailingPE が None の場合 forwardPE を使用
+  - 銘柄名は longName（日本語）優先
+  - セクターを日本語に翻訳
+  - 配当利回りを複数フィールドから算出・異常値補正
+  - 選定基準を run_screening の引数で上書き可能
 """
 
 import yfinance as yf
@@ -25,6 +29,21 @@ CRITERIA = {
     "max_workers": 40,
 }
 
+# yfinance セクター名 → 日本語
+SECTOR_JA: dict = {
+    "Basic Materials":        "素材・化学",
+    "Communication Services": "情報・通信",
+    "Consumer Cyclical":      "消費者サービス",
+    "Consumer Defensive":     "生活必需品",
+    "Energy":                 "エネルギー",
+    "Financial Services":     "金融",
+    "Healthcare":             "ヘルスケア",
+    "Industrials":            "資本財・サービス",
+    "Real Estate":            "不動産",
+    "Technology":             "テクノロジー",
+    "Utilities":              "公共事業",
+}
+
 CHART_LINKS = {
     "minkabu": "https://minkabu.jp/stock/{code}",
     "kabutan": "https://kabutan.jp/stock/chart?code={code}",
@@ -36,6 +55,15 @@ CHART_LINKS = {
 
 def _build_chart_links(code: str) -> dict:
     return {k: v.format(code=code) for k, v in CHART_LINKS.items()}
+
+
+def _translate_sector(sector: Optional[str], industry: Optional[str]) -> str:
+    """セクター名を日本語に変換する。"""
+    if sector and sector in SECTOR_JA:
+        return SECTOR_JA[sector]
+    if sector:
+        return sector  # 未知のセクターはそのまま返す
+    return industry or "不明"
 
 
 def _bs_val(bs, *keys) -> float:
@@ -85,7 +113,28 @@ def _net_cash_ratio(bs, market_cap_jpy: float) -> Optional[float]:
     return net_cash / market_cap_jpy if market_cap_jpy > 0 else 0.0
 
 
-def _fetch_single(code: str) -> Optional[dict]:
+def _div_yield_pct(info: dict) -> float:
+    """
+    配当利回り(%)を算出する。
+    yfinance の dividendYield は小数形式 (0.025 = 2.5%)。
+    異常値の場合は dividendRate / price で再計算し、0〜30% にクランプする。
+    """
+    raw = info.get("dividendYield") or info.get("trailingAnnualDividendYield") or 0
+    pct = float(raw) * 100
+
+    # 0% 以下または 30% 超は dividendRate / price で再計算を試みる
+    if pct <= 0 or pct > 30:
+        div_rate = float(info.get("dividendRate") or 0)
+        price    = float(info.get("currentPrice") or info.get("regularMarketPrice") or 0)
+        if div_rate > 0 and price > 0:
+            pct = div_rate / price * 100
+        else:
+            pct = 0.0
+
+    return round(max(0.0, min(pct, 30.0)), 2)
+
+
+def _fetch_single(code: str, criteria: dict) -> Optional[dict]:
     """1銘柄を取得してスクリーニング基準を適用する。"""
     ticker = None
     info: dict = {}
@@ -107,7 +156,7 @@ def _fetch_single(code: str) -> Optional[dict]:
     # --- 時価総額 ---
     market_cap_jpy = info["marketCap"]
     market_cap_oku = market_cap_jpy / 1e8
-    if not (CRITERIA["market_cap_min_oku"] <= market_cap_oku <= CRITERIA["market_cap_max_oku"]):
+    if not (criteria["market_cap_min_oku"] <= market_cap_oku <= criteria["market_cap_max_oku"]):
         return None
 
     # --- PBR ---
@@ -117,7 +166,7 @@ def _fetch_single(code: str) -> Optional[dict]:
         bvps  = info.get("bookValue") or 0
         if price and bvps > 0:
             pbr = price / bvps
-    if not pbr or pbr <= 0 or pbr > CRITERIA["pbr_max"]:
+    if not pbr or pbr <= 0 or pbr > criteria["pbr_max"]:
         return None
 
     # --- PER (trailing → forward → price/EPS の順) ---
@@ -129,7 +178,7 @@ def _fetch_single(code: str) -> Optional[dict]:
         eps   = info.get("trailingEps") or 0
         if price and eps > 0:
             per = price / eps
-    if not per or per <= 0 or per > CRITERIA["per_max"]:
+    if not per or per <= 0 or per > criteria["per_max"]:
         return None
 
     # --- ネットキャッシュ比率 (balance_sheet から算出) ---
@@ -141,12 +190,12 @@ def _fetch_single(code: str) -> Optional[dict]:
         pass
 
     # データが取れて基準未満なら除外。データ未取得は通過させてソート末尾に置く
-    if ncr is not None and ncr < CRITERIA["net_cash_ratio_min"]:
+    if ncr is not None and ncr < criteria["net_cash_ratio_min"]:
         return None
 
     # --- 付加情報 ---
-    div_yield = (info.get("dividendYield") or 0) * 100
-    sector    = info.get("sector") or info.get("industry") or "不明"
+    sector    = _translate_sector(info.get("sector"), info.get("industry"))
+    div_yield = _div_yield_pct(info)
 
     net_cash_oku = None
     if ncr is not None:
@@ -154,23 +203,28 @@ def _fetch_single(code: str) -> Optional[dict]:
 
     return {
         "code":           code,
-        "name":           info.get("shortName") or info.get("longName") or code,
+        "name":           info.get("longName") or info.get("shortName") or code,
         "sector":         sector,
         "price":          info.get("currentPrice") or info.get("regularMarketPrice") or 0,
         "pbr":            round(pbr, 2),
         "per":            round(per, 2),
         "market_cap_oku": round(market_cap_oku, 1),
-        "dividend_yield": round(div_yield, 2),
+        "dividend_yield": div_yield,
         "net_cash_ratio": round(ncr, 2) if ncr is not None else None,
         "net_cash_oku":   net_cash_oku,
         "chart_links":    _build_chart_links(code),
     }
 
 
-def run_screening(candidate_codes: list) -> dict:
+def run_screening(candidate_codes: list, criteria: Optional[dict] = None) -> dict:
+    """
+    スクリーニングを実行する。
+    criteria に値を渡すとデフォルト (CRITERIA) を上書きできる。
+    """
+    c = {**CRITERIA, **(criteria or {})}
     passed = []
-    with ThreadPoolExecutor(max_workers=CRITERIA["max_workers"]) as executor:
-        futures = {executor.submit(_fetch_single, c): c for c in candidate_codes}
+    with ThreadPoolExecutor(max_workers=c["max_workers"]) as executor:
+        futures = {executor.submit(_fetch_single, code, c): code for code in candidate_codes}
         for future in as_completed(futures):
             result = future.result()
             if result:
@@ -181,12 +235,12 @@ def run_screening(candidate_codes: list) -> dict:
         -(x["net_cash_ratio"] if x["net_cash_ratio"] is not None else -999),
         x["pbr"]
     ))
-    top = passed[:CRITERIA["top_n"]]
+    top = passed[:c["top_n"]]
 
     return {
         "stocks":         top,
         "total_screened": len(candidate_codes),
         "total_passed":   len(passed),
-        "criteria":       CRITERIA,
+        "criteria":       c,
         "updated_at":     datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }

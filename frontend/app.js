@@ -5,6 +5,69 @@ const API_BASE = '';  // 同一オリジン（FastAPIが静的ファイルも配
 let currentData = [];
 let sortCol = 'net_cash_ratio';
 let sortAsc = false;
+let defaultCriteria = {};
+
+// ===== 起動時: デフォルト基準を取得してフォームに反映 =====
+async function loadCriteria() {
+  try {
+    const res = await fetch(`${API_BASE}/api/criteria`);
+    if (res.ok) {
+      defaultCriteria = await res.json();
+      applyCriteriaToForm(defaultCriteria);
+      updateBadges(defaultCriteria);
+    }
+  } catch (e) {
+    // サーバー未起動時は無視
+  }
+}
+
+function applyCriteriaToForm(c) {
+  document.getElementById('cfgNcr').value    = c.net_cash_ratio_min ?? 0.5;
+  document.getElementById('cfgCapMin').value = c.market_cap_min_oku ?? 50;
+  document.getElementById('cfgCapMax').value = c.market_cap_max_oku ?? 1000;
+  document.getElementById('cfgPbr').value    = c.pbr_max ?? 1.0;
+  document.getElementById('cfgPer').value    = c.per_max ?? 20;
+  document.getElementById('cfgTopN').value   = c.top_n ?? 20;
+}
+
+function collectCriteria() {
+  return {
+    net_cash_ratio_min: parseFloat(document.getElementById('cfgNcr').value),
+    market_cap_min_oku: parseFloat(document.getElementById('cfgCapMin').value),
+    market_cap_max_oku: parseFloat(document.getElementById('cfgCapMax').value),
+    pbr_max:            parseFloat(document.getElementById('cfgPbr').value),
+    per_max:            parseFloat(document.getElementById('cfgPer').value),
+    top_n:              parseInt(document.getElementById('cfgTopN').value),
+  };
+}
+
+function resetCriteria() {
+  applyCriteriaToForm(defaultCriteria);
+  updateBadges(defaultCriteria);
+}
+
+function toggleSettings() {
+  const panel = document.getElementById('settingsPanel');
+  const btn   = document.getElementById('btnSettings');
+  const open  = panel.style.display === 'none' || panel.style.display === '';
+  if (open && panel.style.display === 'none') {
+    panel.style.display = '';
+    btn.textContent = '✕ 閉じる';
+  } else {
+    panel.style.display = 'none';
+    btn.textContent = '⚙ 基準を変更';
+  }
+}
+
+function updateBadges(c) {
+  const el = (id) => document.getElementById(id);
+  if (!c) return;
+  el('badgeNcr').textContent  = `ネットキャッシュ比率 ≥ ${c.net_cash_ratio_min}`;
+  el('badgeCap').textContent  = `時価総額 ${c.market_cap_min_oku}〜${c.market_cap_max_oku}億円`;
+  el('badgePbr').textContent  = `PBR ≤ ${c.pbr_max}倍`;
+  el('badgePer').textContent  = `PER ≤ ${c.per_max}倍`;
+  el('badgeTopN').textContent = `上位${c.top_n}社表示`;
+}
 
 // ===== メイン: スクリーニング実行 =====
 async function runScreening() {
@@ -18,8 +81,20 @@ async function runScreening() {
   hideElement('statsRow');
   showElement('loader');
 
+  const c = collectCriteria();
+  updateBadges(c);
+
+  const params = new URLSearchParams({
+    net_cash_ratio_min: c.net_cash_ratio_min,
+    market_cap_min_oku: c.market_cap_min_oku,
+    market_cap_max_oku: c.market_cap_max_oku,
+    pbr_max:            c.pbr_max,
+    per_max:            c.per_max,
+    top_n:              c.top_n,
+  });
+
   try {
-    const res = await fetch(`${API_BASE}/api/screen`);
+    const res = await fetch(`${API_BASE}/api/screen?${params}`);
 
     if (res.status === 429) {
       showError('スクリーニングが既に実行中です。しばらくお待ちください。');
@@ -181,3 +256,6 @@ function escHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
+
+// ===== 初期化 =====
+loadCriteria();

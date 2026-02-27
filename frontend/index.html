@@ -33,11 +33,53 @@
       <div class="criteria-bar-inner">
         <span class="criteria-label">選定基準</span>
         <div class="criteria-badges">
-          <span class="badge badge-blue">ネットキャッシュ比率 ≥ 0.5</span>
-          <span class="badge badge-purple">時価総額 50〜1,000億円</span>
-          <span class="badge badge-green">PBR ≤ 1.0倍</span>
-          <span class="badge badge-orange">PER ≤ 20倍</span>
-          <span class="badge badge-gray">上位20社表示</span>
+          <span class="badge badge-blue" id="badgeNcr">ネットキャッシュ比率 ≥ 0.5</span>
+          <span class="badge badge-purple" id="badgeCap">時価総額 50〜1,000億円</span>
+          <span class="badge badge-green" id="badgePbr">PBR ≤ 1.0倍</span>
+          <span class="badge badge-orange" id="badgePer">PER ≤ 20倍</span>
+          <span class="badge badge-gray" id="badgeTopN">上位20社表示</span>
+        </div>
+        <button class="btn-settings" onclick="toggleSettings()" id="btnSettings">
+          ⚙ 基準を変更
+        </button>
+      </div>
+    </section>
+
+    <!-- 基準設定パネル -->
+    <section id="settingsPanel" class="settings-panel" style="display:none">
+      <div class="settings-panel-inner">
+        <h3 class="settings-title">スクリーニング基準の設定</h3>
+        <div class="settings-grid">
+          <label class="settings-field">
+            <span class="settings-label">ネットキャッシュ比率 ≥</span>
+            <input type="number" id="cfgNcr" class="settings-input" step="0.1" min="0" max="10" />
+          </label>
+          <label class="settings-field">
+            <span class="settings-label">時価総額 最小（億円）</span>
+            <input type="number" id="cfgCapMin" class="settings-input" step="10" min="0" />
+          </label>
+          <label class="settings-field">
+            <span class="settings-label">時価総額 最大（億円）</span>
+            <input type="number" id="cfgCapMax" class="settings-input" step="100" min="0" />
+          </label>
+          <label class="settings-field">
+            <span class="settings-label">PBR ≤</span>
+            <input type="number" id="cfgPbr" class="settings-input" step="0.1" min="0" max="20" />
+          </label>
+          <label class="settings-field">
+            <span class="settings-label">PER ≤</span>
+            <input type="number" id="cfgPer" class="settings-input" step="1" min="0" max="200" />
+          </label>
+          <label class="settings-field">
+            <span class="settings-label">表示件数</span>
+            <input type="number" id="cfgTopN" class="settings-input" step="5" min="1" max="100" />
+          </label>
+        </div>
+        <div class="settings-actions">
+          <button class="btn-secondary" onclick="resetCriteria()">デフォルトに戻す</button>
+          <button class="btn-primary" onclick="runScreening()">
+            <span class="btn-icon">▶</span>この基準で実行
+          </button>
         </div>
       </div>
     </section>

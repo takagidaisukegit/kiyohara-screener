@@ -2,15 +2,16 @@
 清原達郎式スクリーナー - FastAPI バックエンド
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from typing import Optional
 import threading
 import os
 import logging
 
-from screener import run_screening
+from screener import run_screening, CRITERIA
 from candidates import CANDIDATE_CODES
 
 logging.basicConfig(level=logging.INFO)
@@ -34,20 +35,42 @@ app.add_middleware(
 _cache: dict = {"data": None, "lock": threading.Lock(), "running": False}
 
 
+@app.get("/api/criteria")
+def get_criteria():
+    """デフォルトのスクリーニング基準を返す"""
+    return CRITERIA
+
+
 @app.get("/api/screen")
-def screen():
+def screen(
+    net_cash_ratio_min: Optional[float] = Query(default=None, description="ネットキャッシュ比率 最小値"),
+    pbr_max:            Optional[float] = Query(default=None, description="PBR 上限"),
+    per_max:            Optional[float] = Query(default=None, description="PER 上限"),
+    market_cap_min_oku: Optional[float] = Query(default=None, description="時価総額 最小（億円）"),
+    market_cap_max_oku: Optional[float] = Query(default=None, description="時価総額 最大（億円）"),
+    top_n:              Optional[int]   = Query(default=None, description="表示件数"),
+):
     """
-    スクリーニングを実行して上位20銘柄を返す。
-    同時実行防止のため、実行中は 429 を返す。
+    スクリーニングを実行して結果を返す。
+    クエリパラメータで選定基準を上書き可能。同時実行防止のため、実行中は 429 を返す。
     """
     with _cache["lock"]:
         if _cache["running"]:
             raise HTTPException(status_code=429, detail="スクリーニング実行中です。しばらくお待ちください。")
         _cache["running"] = True
 
+    # クエリパラメータで上書きされた基準のみ override に詰める
+    override: dict = {}
+    if net_cash_ratio_min is not None: override["net_cash_ratio_min"] = net_cash_ratio_min
+    if pbr_max            is not None: override["pbr_max"]            = pbr_max
+    if per_max            is not None: override["per_max"]            = per_max
+    if market_cap_min_oku is not None: override["market_cap_min_oku"] = market_cap_min_oku
+    if market_cap_max_oku is not None: override["market_cap_max_oku"] = market_cap_max_oku
+    if top_n              is not None: override["top_n"]              = top_n
+
     try:
-        logger.info(f"スクリーニング開始: {len(CANDIDATE_CODES)} 銘柄対象")
-        result = run_screening(CANDIDATE_CODES)
+        logger.info(f"スクリーニング開始: {len(CANDIDATE_CODES)} 銘柄対象 override={override}")
+        result = run_screening(CANDIDATE_CODES, override or None)
         with _cache["lock"]:
             _cache["data"] = result
         logger.info(f"スクリーニング完了: {result['total_passed']} 銘柄通過 → 上位 {len(result['stocks'])} 件")

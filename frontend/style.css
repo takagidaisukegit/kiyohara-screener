@@ -89,6 +89,63 @@ body {
 .badge-orange { background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3); }
 .badge-gray   { background: rgba(100,116,139,0.15); color: #94a3b8; border: 1px solid rgba(100,116,139,0.3); }
 
+/* ===== Settings Button (in criteria-bar) ===== */
+.btn-settings {
+  margin-left: auto;
+  background: transparent; color: var(--text-sub);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 5px 14px; font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.btn-settings:hover { color: var(--text); border-color: var(--text-sub); }
+
+/* ===== Settings Panel ===== */
+.settings-panel {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 20px 32px;
+}
+.settings-panel-inner {
+  max-width: 1600px; margin: 0 auto;
+}
+.settings-title {
+  font-size: 13px; font-weight: 700; color: var(--text-sub);
+  text-transform: uppercase; letter-spacing: 0.5px;
+  margin-bottom: 16px;
+}
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.settings-field {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.settings-label {
+  font-size: 11px; color: var(--text-sub); font-weight: 600;
+}
+.settings-input {
+  background: var(--bg3); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 7px 10px; font-size: 13px; width: 100%;
+  transition: border-color 0.15s;
+}
+.settings-input:focus {
+  outline: none; border-color: var(--accent);
+}
+.settings-actions {
+  display: flex; gap: 10px; justify-content: flex-end;
+}
+.btn-secondary {
+  background: transparent; color: var(--text-sub);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 8px 18px; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: color 0.15s, border-color 0.15s;
+}
+.btn-secondary:hover { color: var(--text); border-color: var(--text-sub); }
+
 /* ===== Stats ===== */
 .stats-row {
   display: grid; grid-template-columns: repeat(4, 1fr);
