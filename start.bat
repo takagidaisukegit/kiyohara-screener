@@ -1,46 +1,45 @@
 @echo off
-chcp 65001 >nul
-title 清原達郎式スクリーナー
+title Kiyohara Screener
 
 echo ============================================
-echo  清原達郎式スクリーナー 起動
+echo  Kiyohara Screener - Starting...
 echo ============================================
 echo.
 
 cd /d "%~dp0backend"
 
-:: venv が無ければ作成
+:: Create venv if not exists
 if not exist "venv\Scripts\activate.bat" (
-    echo [1/3] 仮想環境を作成しています...
+    echo [1/3] Creating virtual environment...
     python -m venv venv
     if errorlevel 1 (
-        echo [ERROR] Python が見つかりません。Python 3.11以上をインストールしてください。
+        echo [ERROR] Python not found. Please install Python 3.11+.
         pause
         exit /b 1
     )
 )
 
-:: 仮想環境を有効化
+:: Activate venv
 call venv\Scripts\activate.bat
 
-:: 依存パッケージをインストール（初回 or 更新時）
-echo [2/3] 依存パッケージを確認しています...
+:: Install / update packages
+echo [2/3] Installing packages...
 pip install -q -r requirements.txt
 if errorlevel 1 (
-    echo [ERROR] パッケージのインストールに失敗しました。
+    echo [ERROR] Failed to install packages.
     pause
     exit /b 1
 )
 
-:: ブラウザを少し遅れて開く（サーバー起動を待つ）
-echo [3/3] サーバーを起動しています...
+:: Open browser after 2 sec delay
+echo [3/3] Starting server...
 echo.
-echo  アクセス先: http://localhost:8000
-echo  停止するには Ctrl+C を押してください
+echo  URL : http://localhost:8000
+echo  Stop: Ctrl+C
 echo.
 start /b cmd /c "timeout /t 2 >nul && start http://localhost:8000"
 
-:: サーバー起動
+:: Start server
 python main.py
 
 pause
